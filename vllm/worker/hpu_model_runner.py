@@ -628,9 +628,6 @@ class HPUModelRunnerBase(ModelRunnerBase[TModelInputForHPU]):
         self.input_registry = input_registry
         self.mm_registry = mm_registry
         self.mm_registry = MULTIMODAL_REGISTRY
-        self.multi_modal_input_mapper = self.mm_registry \
-            .create_input_mapper(self.model_config)
-        self.mm_registry.init_mm_limits_per_prompt(self.model_config)
 
         # Lazy initialization
         self.lora_manager: LRUCacheWorkerLoRAManager = None
@@ -681,6 +678,7 @@ class HPUModelRunnerBase(ModelRunnerBase[TModelInputForHPU]):
         # Multi-modal data support
         self.multi_modal_input_mapper = MULTIMODAL_REGISTRY \
             .create_input_mapper(self.model_config)
+        self.mm_registry.init_mm_limits_per_prompt(self.model_config)
 
         self.skip_warmup = os.environ.get('VLLM_SKIP_WARMUP',
                                           'false').lower() == 'true'
@@ -957,7 +955,18 @@ class HPUModelRunnerBase(ModelRunnerBase[TModelInputForHPU]):
                                                    pad=0,
                                                    dtype=torch.long,
                                                    device='cpu')
-
+        if len(multi_modal_kwargs_list
+               ) > 0 and 'img_idx' in multi_modal_kwargs_list[0]:
+            new_img_idx_list = []
+            for i, multi_modal_inputs_content in enumerate(
+                    multi_modal_kwargs_list):
+                img_idx_new = multi_modal_inputs_content[
+                    'img_idx'] + i * max_prompt_len
+                new_img_idx_list.append(img_idx_new)
+            for i, multi_modal_inputs_content in enumerate(
+                    multi_modal_kwargs_list):
+                multi_modal_inputs_content['img_idx'] = new_img_idx_list[
+                    i].clone()
         input_positions = make_tensor_with_pad(input_positions,
                                                max_len=max_prompt_len,
                                                pad=0,
